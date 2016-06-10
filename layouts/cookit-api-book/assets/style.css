@@ -130,22 +130,22 @@ div.clear hr {
   float: left;
 }
 
-a.link-depth-1 {
+.sidebar-header-1 {
     font-size: 150%;
     line-height: 2em;
 }
-a.link-depth-2 {
+.sidebar-header-2 {
     font-size: 130%;
     line-height: 1.5em;
 }
-a.link-depth-3 {
+.sidebar-header-3 {
     font-size: 90%;
     line-height: 1.2em;
 }
-a.link-depth-4 {
+.sidebar-header-4 {
     font-size: 70%;
 }
-a.link-depth-5 {
+.sidebar-header-5 {
     font-size: 50%;
 }
 

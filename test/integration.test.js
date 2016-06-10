@@ -71,16 +71,21 @@ describe('integration tests', function() {
     it('reads and scopes the meta.json based on the path relative to target directory', function(done) {
       var dir = fixture.dir({
         'meta.json': JSON.stringify({
-          foo: { pn: 'foo' },
-          'abc/bar': { pn: 'abc/bar' }
+          '*': { cascade: 'value-from-*' },
+          foo: { cascade: 'value-from-key-foo' },
+          'foo/*': { cascade: 'value-from-key-foo-*' },
+          'abc/bar': { cascade: 'value-from-key-abc/bar' },
+          'abc/bar/baz/*': { cascade: 'value-from-key-abc-bar-baz-*' }
         }),
-        'foo.md': 'pn: aaa\nbase: keep\n---\nfoo', // projectName foo
-        'foo/bar.md': 'pn: bbb\n---\nbar', // projectName foo
-        'abc/bar/baz.md': 'pn: ccc\n---\nbaz' // projectName abc/bar
+        'foo.md': 'file: foo.md\nbase: keep\n---\nfoo.md', // components: *, foo
+        'foo/bar.md': 'file: foo/bar.md\n---\nfoo/bar.md', // components: *, foo, bar
+        'abc/bar.md': 'file: abc/bar.md\n---\nabc/bar.md', // components: *, abc, bar
+        'abc/bar/baz.md': 'file: abc/bar/baz.md\n---\nabc/bar/baz.md', // components: *, abc, bar, baz
+        'abc/bar/baz/foo.md': 'file: abc/bar/baz/foo.md\n---\nabc/bar/baz.md' // components: *, abc, bar, baz, foo
       });
 
       var layoutDir = fixture.dir({
-        'page.html': '"{{pn}}","{{base}}"\n{{> content}}'
+        'page.html': '"{{file}}","{{cascade}}","{{base}}"\n{{> content}}'
       });
       var out = fixture.dirname();
 
@@ -90,16 +95,65 @@ describe('integration tests', function() {
         layout: layoutDir
       }, function() {
         assert.equal(fs.readFileSync(out + '/foo.html', 'utf8'), [
-            '"foo","keep"',
-            '<p>foo</p>\n'
+            '"foo.md","value-from-key-foo","keep"',
+            '<p>foo.md</p>\n'
           ].join('\n'));
         assert.equal(fs.readFileSync(out + '/foo/bar.html', 'utf8'), [
-            '"foo",""',
-            '<p>bar</p>\n'
+            '"foo/bar.md","value-from-key-foo-*",""',
+            '<p>foo/bar.md</p>\n'
+          ].join('\n'));
+        assert.equal(fs.readFileSync(out + '/abc/bar.html', 'utf8'), [
+            '"abc/bar.md","value-from-key-abc/bar",""',
+            '<p>abc/bar.md</p>\n'
           ].join('\n'));
         assert.equal(fs.readFileSync(out + '/abc/bar/baz.html', 'utf8'), [
-            '"abc/bar",""',
-            '<p>baz</p>\n'
+            '"abc/bar/baz.md","value-from-*",""',
+            '<p>abc/bar/baz.md</p>\n'
+          ].join('\n'));
+        assert.equal(fs.readFileSync(out + '/abc/bar/baz/foo.html', 'utf8'), [
+            '"abc/bar/baz/foo.md","value-from-key-abc-bar-baz-*",""',
+            '<p>abc/bar/baz.md</p>\n'
+          ].join('\n'));
+        done();
+      });
+    });
+
+    it('when the same header is repeated, ' +
+      'the header links are unique (within a particular file, but not across the render)', function(done) {
+      var dir = fixture.dir({
+        'foo.md': [
+          '# some heading',
+          'hello',
+          '# some heading',
+        ].join('\n'),
+        'bar.md': [
+          '# some heading',
+          'hello',
+          '# some heading',
+        ].join('\n')
+      });
+      var out = fixture.dirname();
+
+      var layoutDir = fixture.dir({
+        'page.html': '{{> content}}'
+      });
+
+      mds.render({
+        input: dir,
+        output: out,
+        layout: layoutDir
+      }, function() {
+        assert.equal(fs.readFileSync(out + '/foo.html', 'utf8'), [
+          '<h1 id="some-heading">some heading</h1>',
+          '<p>hello</p>',
+          '<h1 id="some-heading-1">some heading</h1>',
+          ''
+          ].join('\n'));
+        assert.equal(fs.readFileSync(out + '/bar.html', 'utf8'), [
+          '<h1 id="some-heading">some heading</h1>',
+          '<p>hello</p>',
+          '<h1 id="some-heading-1">some heading</h1>',
+          ''
           ].join('\n'));
         done();
       });
@@ -118,12 +172,12 @@ describe('integration tests', function() {
           md.parseMd(),
           md.annotateMdHeadings(),
           md.highlight(),
-          md.convertMd(),
+          mds.convertMd(),
 
           setOutputPath({
             input: '/fake/input',
             output: '/fake/output',
-            assetDir: '/fake/output/assets/'
+            'asset-path': '/fake/output/assets/'
           }),
 
           applyTemplate(opts),
@@ -159,8 +213,8 @@ describe('integration tests', function() {
       }, { template: 'a{{> toc}}b' }, function(html) {
         assert.equal(html, [
           'a<ul class="nav nav-list">',
-          '    <li><a href="#foo">foo</a></li>',
-          '    <li><a href="#bar">bar</a></li>',
+          '    <li class="sidebar-header-1"><a href="#foo">foo</a></li>',
+          '    <li class="sidebar-header-2"><a href="#bar">bar</a></li>',
           '</ul>',
           'b'
         ].join('\n'));
@@ -229,10 +283,64 @@ describe('integration tests', function() {
       }, function(html) {
         assert.equal(html, [
           'a<p>a</p>',
-          '<h1 id="foo">foo</h1>',
+          '<h1 id="foo"><a class="header-link" href="#foo"></a>foo</h1>',
           '<pre class="hljs"><code>' +
           '<span class="hljs-keyword">var</span> foo = bar;</code></pre>b'
         ].join('\n'));
+        done();
+      });
+    });
+
+    it('when the same header text is repeated, it produces ids with a number appended to them', function(done) {
+      render({ contents: [
+        '# some heading',
+        'hello',
+        '# some heading',
+        'world',
+        '# some heading',
+      ].join('\n') }, {
+        template: '{{> content}}'
+      }, function(html) {
+        assert.equal(html, [
+          '<h1 id="some-heading"><a class="header-link" href="#some-heading"></a>some heading</h1>',
+          '<p>hello</p>',
+          '<h1 id="some-heading-1"><a class="header-link" href="#some-heading-1"></a>some heading</h1>',
+          '<p>world</p>',
+          '<h1 id="some-heading-2"><a class="header-link" href="#some-heading-2"></a>some heading</h1>',
+          ''
+        ].join('\n'));
+        done();
+      });
+    });
+
+    it('replaces .md in local links but not in remote links ', function(done) {
+      render({
+        contents: [
+          'title: Hello world',
+          'author: Anonymous',
+          '----',
+          '# Test',
+          '[foo](./foo.md)',
+          '[bar](bar.md)',
+          '[baz](/baz.md)',
+          '[multi](./multi.md.md)',
+          '[http](http://foo.md)',
+          '[https](https://foo.md)',
+          '[ftp](ftp://foo.md)',
+          '[javascript](javascript://foo.md)',
+        ].join('\n')
+       }, { template: '{{> content}}' }, function(html) {
+        assert.equal(html, [
+            '<h1 id="test"><a class="header-link" href="#test"></a>Test</h1>',
+            '<p><a href="./foo.html">foo</a>',
+            '<a href="./bar.html">bar</a>',
+            '<a href="/baz.html">baz</a>',
+            '<a href="./multi.md.html">multi</a>',
+            '<a href="http://foo.md">http</a>',
+            '<a href="https://foo.md">https</a>',
+            '<a href="ftp://foo.md">ftp</a>',
+            '<a href="javascript://foo.md">javascript</a></p>\n',
+          ].join('\n'));
         done();
       });
     });

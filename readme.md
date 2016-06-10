@@ -1,13 +1,18 @@
 # markdown-styles
 
-Converts Markdown files to HTML, with over a dozen builtin themes. The new `v2.0` release includes a ton of enhancements!
+Converts Markdown files to HTML, with over a dozen builtin themes.
 
 Looking for something to generate a blog from Markdown files? Check out [ghost-render](https://github.com/mixu/ghost-render).
 
+Looking to automatically render your Markdown site on `git push`? Check out [markdown-styles-lambda](https://github.com/mixu/markdown-styles-lambda)
+
 ## Features
 
-- `v2.3` adds one new feature: header hover anchor links. When you hover over a header, a hover anchor link appears to the side of the header. Clicking on that link or copying its URL produces a link to that specific location on the page. All built-in layouts support this feature by default.
-- `v2.2` added Windows support (!)
+- `v3.1.6` fixes a compatibility issue with Node 6, thanks @maximumstock!
+- `v3.1.5` updates some dependencies to add YAML syntax highlighting, thanks @omnibs!
+- `v3.1.4` added linkification for relative links to markdown files, e.g. `[link](./foo.md)` -> `<a href="./foo.html">link</a>`.
+- `v3.1.3` added a few additional properties to the programmatic API.
+- `v3.1.2` added default classes that allow you to [style headings in the table of contents](#table-of-contents). See [the changelog](./changelog.md) for changes made in older versions.
 - Includes 15+ ready-made CSS stylesheets for Markdown, see the bottom of the readme for screenshots.
 - Reuse the stylesheets or use the `generate-md` tool to convert a folder of Markdown files to HTML using one of the built-in layouts or a custom layout.
 - Completely static output is easy to host anywhere.
@@ -18,7 +23,7 @@ Looking for something to generate a blog from Markdown files? Check out [ghost-r
 - Built in support for code syntax highlighting via highlight.js; all layouts include a Github-style code highlighting theme by default.
 - Built in table of contents generation from Markdown headings, fully customizable by replacing the `{{> toc}}` partial in custom layout.
 - Built in header id and anchor generation for headings written in Markdown; all layouts support revealing the URL via header hover links.
-- Support for custom logic for rendering code blocks via `--highlight-*`; this can be used to implement custom blocks that render the content of the code block in some interesting way.
+- Support for custom logic for rendering code blocks via `--highlight-*`; this can be used to implement custom blocks that render the content of the code block in some interesting way. For example, I used this in my CSS book to [implement](https://github.com/mixu/cssbook/blob/master/layout/highlighters/spoiler.js) hidden [spoiler texts](http://book.mixu.net/css/5-tricks.html#box-rendering-and-stacking-context).
 - Automatically detects the document title from the first heading in the Markdown markup.
 
 ### Features for creating your own layout
@@ -49,7 +54,7 @@ Create a markdown file and then convert it to html:
 
 Try out different layouts by changing the `--layout` parameter; screenshots are at the bottom of this page.
 
-![montage](https://github.com/mixu/markdown-styles/raw/master/screenshots/montage.png)
+![montage](https://github.com/mixu/markdown-styles/raw/master/screenshots/montage.jpg)
 
 ## generate-md CLI options
 
@@ -98,11 +103,31 @@ The following built in layouts include the `{{~> toc}}` partial:
 
 These are mostly templates that have a sensible place to put this table of contents, such as a sidebar. I didn't want to default to putting a table of contents into the layouts that had no sidebar, but you can add it quite easily.
 
-The `{{~> toc}}` partial generates a table of contents list. The list contains links to every header in your Markdown file. In addition, every Markdown header is automatically converted to a linkable anchor (e.g. `#table_of_contents`) when the page is generated. You can customize the table of contents markup by overriding the [./partials/toc.hbs](https://github.com/mixu/markdown-styles/blob/master/builtin/partials/toc.hbs) partial in your custom layout.
+The `{{~> toc}}` partial generates a table of contents list. The list contains links to every header in your Markdown file. In addition, every Markdown header is automatically converted to a linkable anchor (e.g. `#table_of_contents`) when the page is generated.
+
+You can customize the table of contents markup by overriding the [./partials/toc.hbs](https://github.com/mixu/markdown-styles/blob/master/builtin/partials/toc.hbs) partial in your custom layout. By default, it looks like this:
+
+```html
+<ul class="nav nav-list">
+  {{#each headings}}
+    <li class="sidebar-header-{{depth}}"><a href="#{{id}}">{{text}}</a></li>
+  {{/each}}
+</ul>
+```
+
+Note that by default (since v3.1.2), each heading list item has a class that depends on the level of the heading (`.sidebar-heading-1`, `.sidebar-heading-2`, ...). Thanks @mixinmax!
+
+The `headings` metadata is an array of objects with:
+
+- an `id` field (the HTML anchor id),
+- a `text` field (the heading text) and
+- a `depth` field (the depth of the heading, e.g. the number of `#` characters in the heading).
 
 ## Header hover links (v2.1)
 
 If you are reading this on Github, hover over the header above. You'll see a link appear on the side of the header. The same feature is supported by all of the layouts. The feature is implemented purely with CSS, and you can find the details in `pilcrow.css` in each layout's assets folder. To disable the feature, pass the `--no-header-links` flag.
+
+`v2.4` added support for having unique links for duplicated header names (e.g. using the same header text multiple times in the same file). The header id for the first occurrence stays the same as earlier (`#header-text`), but the second and subsequent headers get a counter appended (e.g. `#header-text-1`, `#header-text-2`). Thanks @xcv58!
 
 ## Metadata sections
 
@@ -149,17 +174,21 @@ which will result in:
 </ul>
 ```
 
-If you take a look at [the `{{~> toc}}` built in partial](https://github.com/mixu/markdown-styles/blob/master/builtin/partials/toc.hbs), you can see that it is actually iterating over a metadata field called `headings` using the same syntax. The `headings` metadata is an array of objects with an `id` field (the HTML anchor id), a `text` field (the heading text) and a `depth` field (the depth of the heading, e.g. the number of `#` characters in the heading).
+If you take a look at [the `{{~> toc}}` built in partial](https://github.com/mixu/markdown-styles/blob/master/builtin/partials/toc.hbs), you can see that it is actually [iterating over a metadata field](#table-of-contents) called `headings` using the same syntax.
 
 ## Writing your own layout
 
 `v2.0` makes it easier to get started with a custom layout via `--export`, which exports a built in layout as a starting point. Just pick a reasonable built in layout and start customizing. For example:
 
-    generate-md --export github --output ./my-layout
+```sh
+generate-md --export github --output ./my-layout
+```
 
 will export the `github` layout to `./my-layout`. To make use of your new layout:
 
-    generate-md --layout ./my-layout --input ./some-input --output ./output
+```sh
+generate-md --layout ./my-layout --input ./some-input --output ./output
+```
 
 If you look under `./my-layout`, you'll see that a layout folder consists of:
 
@@ -258,38 +287,101 @@ Note the usage of the "triple-stash", e.g. `{{{` here. The technical reason for 
 </ul>
 ```
 
-### `meta.json`
+### `meta.json` (new behavior in 3.x)
 
-If you want to apply additional metadata to all Markdown files in a particular folder, you can add a file named `meta.json` to the input folder. (Note: in `v1.x`, `meta.json` was read from `process.cwd()`, e.g. the folder from which you ran `generate-md`).
+If you want to apply additional metadata to all Markdown files in a particular folder, you can add a file named `meta.json` to the root of the input folder.
 
-`meta.json` will be read, and the values in it are added to the regular metadata. The values from `meta.json` act like default values, e.g. the per-file metadata section values will override the values from `meta.json`.
+For example, if you run `generate-md --input foo`, the `meta.json` file should be located at `./foo/meta.json`.
 
-The metadata is scoped by the top-level directory in `./input`.
+(Note: in `v1.x`, `meta.json` was read from `process.cwd()`, e.g. the folder from which you ran `generate-md`).
+
+Metadata handling has changed in v3.0.0. The metadata is now applied by sequentially merging keys which represent paths. This allows you to set default values for all of the files and then override those values for each subdirectory in `meta.json`
+
+The keys in meta.json represent file paths relative to the root of the input directory. Each file will be rendered with the merged metadata.
+
+Here are a couple of quick examples:
+
+| meta.json content                 | `{{key}}` is available in: |
+|-----------------------------------|-----------------------------------------
+| `{ "*": {"key": "value" }}`       | all input files
+| `{ "foo": {"key": "value" }}`     | `./input/foo.md`
+| `{ "foo/*": {"key": "value" }}`   | `./input/foo/*` and subdirs
+| `{ "foo/bar": {"key": "value" }}` | `./input/foo/bar.md`
+| `{ "foo/bar/*": {"key": "value" }}` | `./input/foo/bar/*` and subdirs
+
+More specifically, the merge proceeds as follows:
+
+- Start with an empty object
+- Read the `*` key in `meta.json`
+- Take split the pathname of the current file relative to the input directory by the path separator (`/` in Linux/OSX and `\\` in Windows; note that the key lookup will always use `/` on all platforms). For example, if the filename is `./input/a/b/c.md` and the input directory is `./input`, then the path components would be `a`, `b`.
+- Concatenate the components one by one and look for keys that end with the concatenated path + `/*`. For example, for `./input/a/b/c.md`, the keys will be `a/*`, `a/b/*`.
+- Merge the metadata values from the keys in order of specificity, e.g. starting with the values under the `*` key, then `a/*`, then `a/b/*`.
+- Look for a key that matches the full relative file name without the extension. e.g. `a/b/c`, and merge that in.
+- Read the file, and overwrite the metadata values with the values set in the file.
+- Finally, if the title property is still not set, automatically set using the first heading in the markdown file.
 
 For example, a `./input/meta.json` file like this:
 
 ````json
 {
-  "foo": {
-    "repoUrl": "https://github.com/mixu/markdown-styles"
+  "*": {
+    "repoUrl": "DEFAULT"
+  },
+  "foo/*": {
+    "repoUrl": "MORE SPECIFIC"
   }
 }
 ````
 
-would make the metadata value `{{repoUrl}}` available in the template, for all files that are in the directory `./input/foo`. If any markdown file in `./input/foo/` defines a metadata value called `repoUrl`, then that value will override the value from `meta.json`.
+would make the metadata value `{{repoUrl}}` available in the template for all input files to `DEFAULT` except for input files in `./input/foo/`. For `./input/foo/*` and all subdirectories, `repoUrl` would be set to `MORE SPECIFIC`.
+
+If any markdown file in `./input/foo/` defines a metadata value called `repoUrl`, then that value will override the value from `meta.json`.
 
 ### API
 
-It exists, and uses the same options as `generate-md`. Docs TODO, see `bin/generate-md` and `test/api.test.js` for now.
+- `.resolveArgs(argv)`: given a hash containing command line args, returns the fully resolved arguments. This does two things: it takes care of relative paths and loads the modules passed via `highlight-*` so that they can be invoked as functions when highlighting a specific language.
+- `.render(argv, onDone)`: given a hash of resolved arguments, it processes every file just like the command line tool; this includes copying files.
+- `.pipeline(argv)`: given a hash of resolved arguments, it returns a writable object mode stream that accepts objects with the following keys:
+  - `path` (an absolute path to the input file name),
+  - `stat` (the fs.stat object associated with the input file),
+  - `contents` (a string with the content of the input file).
+- Since `v3.1.3`, the `pipeline` function supports a couple of arguments that are not exposed on the CLI (in addition to all the CLI args):
+  - `meta`: a hash of JSON (the contents of a meta.json file if you prefer to set that explicitly)
+  - `asset-path`: a full path to the `/assets` folder, defaults to `${output}/assets`.
+
+The writable stream returns objects with the same properties, plus any metadata. The pipeline updates `path` to be the output path that generate-md would write the file to, and updates `contents` to be a string of HTML.
+
+To plug the equivalent of `generate-md` into your grunt/gulp etc. task, use the following code:
+
+```js
+var mds = require('markdown-styles'),
+    path = require('path');
+
+mds.render(mds.resolveArgs({
+  input: path.normalize(process.cwd() + '/input'),
+  output: path.normalize(process.cwd() + '/output'),
+  layout: path.normalize(process.cwd() + '/my-layout'),
+}), function() {
+  console.log('All done!');
+});
+```
+
+See `bin/generate-md` and `test/api.test.js` for details.
 
 ## Acknowledgments
 
-I'd like to thank @AaronJan for contributing a patch that adds support for Windows (for `v.2.2.0`+).
+I'd like to thank the following people for contributing new features:
 
-I'd like to thank the following people for either contributing to markdown-styles directly or making CSS stylesheets available with a permissive open source license:
+- @mixinmax for adding default class names to the table of contents
+- @parmentelat for adding the cascading meta.json logic
+- @AaronJan for contributing a patch that adds support for Windows
+- @joebain for a fix related to using markdown-styles with grunt
+- @xcv58 for dealing with the case where the same header text is used multiple times in the same file
+- @iamdoron for contributing the initial implementation of the Handlebars templating integration
+
+I'd like to thank the following people for making CSS stylesheets available with a permissive open source license:
 
 - the `witex` style is based on [AndrewBelt/WiTeX](https://github.com/AndrewBelt/WiTeX)
-- @iamdoron for contributing the initial implementation of the Handlebars templating integration
 - the `github` style is based on [sindresorhus/github-markdown-css](https://github.com/sindresorhus/github-markdown-css)
 - the `bootstrap3` style was contributed by @MrJuliuss
 - jasonm23-dark, jasonm23-foghorn, jasonm23-markdown and jasonm23-swiss are based on https://github.com/jasonm23/markdown-css-themes by [jasonm23](https://github.com/jasonm23)
@@ -300,75 +392,75 @@ I'd like to thank the following people for either contributing to markdown-style
 
 ## Screenshots of the layouts
 
-Note: these screenshots are generated via phantomjs, so they look worse than they do in a real browser because the font rendering is just bad and lacks webfont support. For example, WiTeX actually uses the Latin Modern Roman font from TeX but the screenshots show the fallback font.
+Thanks to [electroshot](https://github.com/mixu/electroshot), the screenshots now look about right (e.g. web fonts render correctly).
 
 ### github
 
-![github](https://github.com/mixu/markdown-styles/raw/master/screenshots/github.png)
+![github](https://github.com/mixu/markdown-styles/raw/master/screenshots/github.jpg)
 
 ### witex
 
-![witex](https://github.com/mixu/markdown-styles/raw/master/screenshots/witex.png)
+![witex](https://github.com/mixu/markdown-styles/raw/master/screenshots/witex.jpg)
 
 ### roryg-ghostwriter
 
-![roryg-ghostwriter](https://github.com/mixu/markdown-styles/raw/master/screenshots/roryg-ghostwriter.png)
+![roryg-ghostwriter](https://github.com/mixu/markdown-styles/raw/master/screenshots/roryg-ghostwriter.jpg)
 
 ### mixu-bootstrap
 
-![mixu-bootstrap](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-bootstrap.png)
+![mixu-bootstrap](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-bootstrap.jpg)
 
 ### mixu-bootstrap-2col
 
-![mixu-bootstrap-2col](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-bootstrap-2col.png)
+![mixu-bootstrap-2col](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-bootstrap-2col.jpg)
 
 ### mixu-gray
 
-![mixu-gray](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-gray.png)
+![mixu-gray](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-gray.jpg)
 
 ### jasonm23-dark
 
-![jasonm23-dark](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-dark.png)
+![jasonm23-dark](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-dark.jpg)
 
 ### jasonm23-foghorn
 
-![jasonm23-foghorn](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-foghorn.png)
+![jasonm23-foghorn](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-foghorn.jpg)
 
 ### jasonm23-markdown
 
-![jasonm23-markdown](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-markdown.png)
+![jasonm23-markdown](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-markdown.jpg)
 
 ### jasonm23-swiss
 
-![jasonm23-swiss](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-swiss.png)
+![jasonm23-swiss](https://github.com/mixu/markdown-styles/raw/master/screenshots/jasonm23-swiss.jpg)
 
 ### markedapp-byword
 
-![markedapp-byword](https://github.com/mixu/markdown-styles/raw/master/screenshots/markedapp-byword.png)
+![markedapp-byword](https://github.com/mixu/markdown-styles/raw/master/screenshots/markedapp-byword.jpg)
 
 ### mixu-book
 
-![mixu-book](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-book.png)
+![mixu-book](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-book.jpg)
 
 ### mixu-page
 
-![mixu-page](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-page.png)
+![mixu-page](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-page.jpg)
 
 ### mixu-radar
 
-![mixu-radar](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-radar.png)
+![mixu-radar](https://github.com/mixu/markdown-styles/raw/master/screenshots/mixu-radar.jpg)
 
 ### thomasf-solarizedcssdark
 
-![thomasf-solarizedcssdark](https://github.com/mixu/markdown-styles/raw/master/screenshots/thomasf-solarizedcssdark.png)
+![thomasf-solarizedcssdark](https://github.com/mixu/markdown-styles/raw/master/screenshots/thomasf-solarizedcssdark.jpg)
 
 ### thomasf-solarizedcsslight
 
-![thomasf-solarizedcsslight](https://github.com/mixu/markdown-styles/raw/master/screenshots/thomasf-solarizedcsslight.png)
+![thomasf-solarizedcsslight](https://github.com/mixu/markdown-styles/raw/master/screenshots/thomasf-solarizedcsslight.jpg)
 
 ### bootstrap3
 
-![bootstrap3](https://github.com/mixu/markdown-styles/raw/master/screenshots/bootstrap3.png)
+![bootstrap3](https://github.com/mixu/markdown-styles/raw/master/screenshots/bootstrap3.jpg)
 
 ## Contributing new styles to markdown-styles
 
