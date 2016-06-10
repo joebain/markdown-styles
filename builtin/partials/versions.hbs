@@ -1,0 +1,8 @@
+{{#if versions}}
+    Versions:
+    <select id="version-select">
+    {{#each versions}}
+        <option id="version-{{version}}" value="{{version}}" {{#if selected}}selected{{/if}}>{{version}}</option>
+    {{/each}}
+    </select>
+{{/if}}

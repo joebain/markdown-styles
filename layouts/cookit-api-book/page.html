@@ -23,6 +23,7 @@
     <script type="text/javascript" src="{{asset 'prettify.js'}}"></script>
     <!-- Script runner -->
     <script type="text/javascript" src="{{asset 'runner.js'}}"></script>
+    <script type="text/javascript" src="{{asset 'version-switcher.js'}}"></script>
   </head>
 <body>
   <div id="wrapper">
@@ -45,7 +46,12 @@
       </div>
     </div>
     <div id="sidebar">
-      {{~> toc}}
+        <div id="version">
+            {{~> versions}}
+        </div>
+        <div id="toc">
+            {{~> toc}}
+        </div>
     </div>
     <div class="clear">
     </div>
